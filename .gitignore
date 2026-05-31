@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+data/*.json
+data/audit.log
+.venv/
+*.egg-info/
