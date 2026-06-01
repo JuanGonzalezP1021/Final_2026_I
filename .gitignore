@@ -6,3 +6,4 @@ data/*.json
 data/audit.log
 .venv/
 *.egg-info/
+data/etl_report.txt
