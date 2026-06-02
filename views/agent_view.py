@@ -6,6 +6,7 @@ from views.widgets.kpi_card import KPICard
 
 class AgentView:
     FIELDS = ('agent_id', 'team_manager', 'active_date', 'days_range', 'tenurity')
+    FORM_FIELDS = ('agent_id', 'team_manager', 'active_date')
 
     def __init__(self, parent, status_var):
         self.ctrl = AgentController()
@@ -85,7 +86,7 @@ class AgentView:
         box.pack(fill='x', padx=8, pady=4)
         
         self.entries = {}
-        for i, f in enumerate(self.FIELDS):
+        for i, f in enumerate(self.FORM_FIELDS):
             ttk.Label(box, text=f.replace('_', ' ').title()).grid(row=0, column=i, padx=4)
             e = ttk.Entry(box, width=14)
             e.grid(row=1, column=i, padx=4, pady=4)
@@ -178,9 +179,10 @@ class AgentView:
         if not sel:
             return
         vals = self.tree.item(sel[0])['values']
-        for i, f in enumerate(self.FIELDS):
+        row = dict(zip(self.FIELDS, vals))
+        for f in self.FORM_FIELDS:
             self.entries[f].delete(0, 'end')
-            self.entries[f].insert(0, str(vals[i]))
+            self.entries[f].insert(0, str(row.get(f, '')))
 
     def _clear(self):
         for e in self.entries.values():

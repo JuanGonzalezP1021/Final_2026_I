@@ -31,6 +31,10 @@ import uuid
 from datetime import datetime
 from typing import Any, Iterable
 
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+from domain.rules.agent_rules import derive_tenurity
+
 
 # ---------------------------------------------------------------- helpers
 
@@ -113,12 +117,19 @@ def transform_roster(csv_path: str):
             agent_id = clean(row.get("Agent"))
             if not agent_id or not agent_id.startswith("Agent"):
                 continue                                            # blank row
+
+            active_date = parse_date(row.get("Active Date") or "")
+            if not active_date:
+                continue
+
+            tenurity, days_range = derive_tenurity(active_date)
+
             yield {
                 "agent_id":     agent_id,
                 "team_manager": clean(row.get("Team Manager")),
-                "active_date":  parse_date(row.get("Active Date") or ""),
-                "days_range":   normalize_days_range(row.get("Days") or ""),
-                "tenurity":     clean(row.get("Tenurity")),
+                "active_date":  active_date,
+                "days_range":   days_range,
+                "tenurity":     tenurity,
             }
 
 

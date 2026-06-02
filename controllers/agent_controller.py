@@ -28,10 +28,9 @@ class AgentController:
         if self.repo.find_by_key(data['agent_id']):
             raise DuplicateError('Agent', data['agent_id'])
 
-        if 'tenurity' not in data or 'days_range' not in data:
-            ten, rng = derive_tenurity(data['active_date'])
-            data.setdefault('tenurity', ten)
-            data.setdefault('days_range', rng)
+        ten, rng = derive_tenurity(data['active_date'])
+        data['tenurity'] = ten
+        data['days_range'] = rng
 
         current = sum(
             1 for a in self.repo.find_all()
@@ -53,6 +52,14 @@ class AgentController:
     def update(self, agent_id, patch: dict) -> Agent:
         existing = self.read(agent_id)
         merged = {**existing.to_dict(), **patch}
+        if 'active_date' in patch:
+            ten, rng = derive_tenurity(merged['active_date'])
+            merged['tenurity'] = ten
+            merged['days_range'] = rng
+        else:
+            merged['tenurity'] = existing.tenurity
+            merged['days_range'] = existing.days_range
+
         agent = Agent(**merged)
         self.repo.update(agent_id, agent.to_dict())
         self.notifier.notify('UPDATE', 'Agent', agent.to_dict())
