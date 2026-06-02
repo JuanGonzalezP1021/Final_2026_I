@@ -1,0 +1,87 @@
+============================= test session starts ==============================
+platform linux -- Python 3.14.5, pytest-9.0.3, pluggy-1.6.0 -- /usr/bin/python
+cachedir: .pytest_cache
+rootdir: /home/carbon/Documentos/Unisalle/2026_I/Logica_Prog_II/Final_1/Final_2026_I
+plugins: anyio-4.12.1
+collecting ... collected 47 items
+
+tests/integration/test_controller_flow.py::TestControllerFlow::test_audit_log_emitted FAILED [  2%]
+tests/integration/test_repository_roundtrip.py::TestRoundtrip::test_insert_read_update_delete PASSED [  4%]
+tests/unit/test_agent_model.py::TestAgentModel::test_bad_date_format PASSED [  6%]
+tests/unit/test_agent_model.py::TestAgentModel::test_bad_days_range PASSED [  8%]
+tests/unit/test_agent_model.py::TestAgentModel::test_bad_id_prefix PASSED [ 10%]
+tests/unit/test_agent_model.py::TestAgentModel::test_bad_id_suffix PASSED [ 12%]
+tests/unit/test_agent_model.py::TestAgentModel::test_bad_tenurity PASSED [ 14%]
+tests/unit/test_agent_model.py::TestAgentModel::test_bad_tl_prefix PASSED [ 17%]
+tests/unit/test_agent_model.py::TestAgentModel::test_days_in_company PASSED [ 19%]
+tests/unit/test_agent_model.py::TestAgentModel::test_roundtrip PASSED    [ 21%]
+tests/unit/test_agent_model.py::TestAgentModel::test_to_dict_keys PASSED [ 23%]
+tests/unit/test_agent_model.py::TestAgentModel::test_valid PASSED        [ 25%]
+tests/unit/test_agent_rules.py::TestAgentRules::test_can_deactivate_blocked PASSED [ 27%]
+tests/unit/test_agent_rules.py::TestAgentRules::test_can_deactivate_clean PASSED [ 29%]
+tests/unit/test_agent_rules.py::TestAgentRules::test_tenurity_buckets PASSED [ 31%]
+tests/unit/test_agent_rules.py::TestAgentRules::test_tenurity_range_string PASSED [ 34%]
+tests/unit/test_agent_rules.py::TestAgentRules::test_tl_capacity_at_limit_raises PASSED [ 36%]
+tests/unit/test_agent_rules.py::TestAgentRules::test_tl_capacity_below_limit PASSED [ 38%]
+tests/unit/test_contact_kpis.py::test_total_contacts PASSED              [ 40%]
+tests/unit/test_contact_kpis.py::test_total_missed PASSED                [ 42%]
+tests/unit/test_contact_kpis.py::test_average_aht PASSED                 [ 44%]
+tests/unit/test_contact_model.py::test_total_contacts PASSED             [ 46%]
+tests/unit/test_contact_model.py::test_aht PASSED                        [ 48%]
+tests/unit/test_forecasters.py::TestForecasters::test_ci_band_width PASSED [ 51%]
+tests/unit/test_forecasters.py::TestForecasters::test_exp_smoothing_alpha_bounds PASSED [ 53%]
+tests/unit/test_forecasters.py::TestForecasters::test_horizon_respected PASSED [ 55%]
+tests/unit/test_forecasters.py::TestForecasters::test_linreg_mae_nonnegative PASSED [ 57%]
+tests/unit/test_forecasters.py::TestForecasters::test_linreg_perfect_trend PASSED [ 59%]
+tests/unit/test_forecasters.py::TestForecasters::test_ma_flat_series PASSED [ 61%]
+tests/unit/test_forecasters.py::TestForecasters::test_ma_too_short_raises PASSED [ 63%]
+tests/unit/test_forecasters.py::TestForecasters::test_mae_lower_for_better_fit PASSED [ 65%]
+tests/unit/test_productivity_model.py::TestProductivityModel::test_aux_ratio_formula PASSED [ 68%]
+tests/unit/test_productivity_model.py::TestProductivityModel::test_bad_date PASSED [ 70%]
+tests/unit/test_productivity_model.py::TestProductivityModel::test_negative_busy PASSED [ 72%]
+tests/unit/test_productivity_model.py::TestProductivityModel::test_occupancy_formula PASSED [ 74%]
+tests/unit/test_productivity_model.py::TestProductivityModel::test_roundtrip PASSED [ 76%]
+tests/unit/test_productivity_model.py::TestProductivityModel::test_score_higher_for_better_metrics PASSED [ 78%]
+tests/unit/test_productivity_model.py::TestProductivityModel::test_score_range PASSED [ 80%]
+tests/unit/test_productivity_model.py::TestProductivityModel::test_utilization_formula PASSED [ 82%]
+tests/unit/test_productivity_model.py::TestProductivityModel::test_valid PASSED [ 85%]
+tests/unit/test_productivity_model.py::TestProductivityModel::test_zero_login_safe PASSED [ 87%]
+tests/unit/test_productivity_rules.py::TestProductivityRules::test_flag_high_aux PASSED [ 89%]
+tests/unit/test_productivity_rules.py::TestProductivityRules::test_flag_low_occupancy PASSED [ 91%]
+tests/unit/test_productivity_rules.py::TestProductivityRules::test_login_cap_exceeded PASSED [ 93%]
+tests/unit/test_productivity_rules.py::TestProductivityRules::test_login_cap_ok PASSED [ 95%]
+tests/unit/test_productivity_rules.py::TestProductivityRules::test_state_sum_ok PASSED [ 97%]
+tests/unit/test_productivity_rules.py::TestProductivityRules::test_state_sum_overflow PASSED [100%]
+
+=================================== FAILURES ===================================
+__________________ TestControllerFlow.test_audit_log_emitted ___________________
+
+self = <tests.integration.test_controller_flow.TestControllerFlow testMethod=test_audit_log_emitted>
+
+    def test_audit_log_emitted(self):
+        ac = AgentController()
+    
+        # Crear un agente
+>       ac.create({
+            'agent_id': 'Agent0001',
+            'team_manager': 'TL1',
+            'active_date': '2025-01-01',
+            'days_range': '0-30',
+            'tenurity': 'New Hire'
+        })
+
+tests/integration/test_controller_flow.py:26: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <controllers.agent_controller.AgentController object at 0x7f8ea6c5af90>
+data = {'active_date': '2025-01-01', 'agent_id': 'Agent0001', 'days_range': '0-30', 'team_manager': 'TL1', ...}
+
+    def create(self, data: dict) -> Agent:
+        if self.repo.find_by_key(data['agent_id']):
+>           raise DuplicateError('Agent', data['agent_id'])
+E           domain.exceptions.custom_exceptions.DuplicateError: Agent already exists: Agent0001
+
+controllers/agent_controller.py:29: DuplicateError
+=========================== short test summary info ============================
+FAILED tests/integration/test_controller_flow.py::TestControllerFlow::test_audit_log_emitted
+========================= 1 failed, 46 passed in 0.10s =========================
