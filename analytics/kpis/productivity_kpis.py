@@ -7,13 +7,17 @@ class ProductivityKPI:
         self.records = records
 
     def avg_occupancy(self) -> float:
-        vals = [r['occupancy'] for r in self.records
-                if r['login_duration'] > 0]
+    # Usamos .get() con un valor por defecto de 0 si 'occupancy' no existe
+        vals = [r.get('occupancy', 0) for r in self.records]
         return mean(vals) if vals else 0.0
+    # Asegúrate de mantener la lógica de filtrado por 'login_duration' si es necesaria:
+    # vals = [r.get('occupancy', 0) for r in self.records if r.get('login_duration', 0) > 0]
+    
+    
 
     def occupancy_distribution(self) -> dict:
-        vals = [r['occupancy'] for r in self.records
-                if r['login_duration'] > 0]
+        vals = [r.get('occupancy', 0) for r in self.records
+                if r.get('login_duration', 0)    > 0]
         if not vals:
             return {}
         s = sorted(vals)

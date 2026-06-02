@@ -213,9 +213,9 @@ def main():
     parser.add_argument("--out-dir", default="./data",
                         help="Where to write the JSON files")
     parser.add_argument("--roster-csv",
-                        default="Business_Analyst_Test _Productivity_xlsx_-_Contacts.csv")
+                        default="Business_Analyst_Test _Productivity_xlsx_-_Roster.csv")
     parser.add_argument("--contacts-csv",
-                        default="Business_Analyst_Test__Productivity_xlsx_-_Contacts.csv")
+                        default="Business_Analyst_Test _Productivity_xlsx_-_Contacts.csv")
     parser.add_argument("--productivity-csv",
                         default="Business_Analyst_Test _Productivity_xlsx_-_Productivity.csv")
     args = parser.parse_args()
