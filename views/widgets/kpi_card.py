@@ -3,30 +3,26 @@ from tkinter import ttk
 
 class KPICard(ttk.Frame):
     def __init__(self, parent, title, formula, **kw):
-        super().__init__(parent, padding=8, **kw)
-        self.configure(relief='ridge', borderwidth=1)
+        super().__init__(parent, padding=(14, 12), style='Card.TFrame', **kw)
 
         # Título del KPI
         ttk.Label(
             self, text=title,
-            font=('Segoe UI', 9, 'bold'),
-            foreground='#415a77'
+            style='CardTitle.TLabel'
         ).pack(anchor='w')
 
         # Valor dinámico
         self.value_var = tk.StringVar(value='--')
         ttk.Label(
             self, textvariable=self.value_var,
-            font=('Segoe UI', 18, 'bold'),
-            foreground='#0d1b2a'
-        ).pack(anchor='w')
+            style='CardValue.TLabel'
+        ).pack(anchor='w', pady=(4, 0))
 
         # Nota de fórmula/descripción
         ttk.Label(
             self, text=formula,
-            font=('Segoe UI', 7),
-            foreground='#6c757d'
-        ).pack(anchor='w')
+            style='CardCaption.TLabel'
+        ).pack(anchor='w', pady=(6, 0))
 
     def set_value(self, value):
         """Actualiza el valor mostrado en el KPI."""

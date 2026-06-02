@@ -5,14 +5,17 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 class ForecastChart(tk.Frame):
     def __init__(self, parent):
         super().__init__(parent)
-        self.fig = Figure(figsize=(6, 3), dpi=100)
+        self.fig = Figure(figsize=(6, 3), dpi=100, facecolor='#f8fafc')
         self.ax = self.fig.add_subplot(111)
+        self.ax.set_facecolor('#f8fafc')
         self.canvas = FigureCanvasTkAgg(self.fig, master=self)
         self.canvas.get_tk_widget().pack(fill='both', expand=True)
 
     def render(self, history, predictions, low, high, title):
         """Renderiza los datos históricos y la predicción en el gráfico."""
         self.ax.clear()
+        self.ax.set_facecolor('#f8fafc')
+        self.fig.patch.set_facecolor('#f8fafc')
         
         h = len(history)
         x_hist = list(range(h))

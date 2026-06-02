@@ -57,17 +57,36 @@ class ProductivityController:
         k = ProductivityKPI(self.repo.find_all())
         return {
             'avg_occupancy': round(k.avg_occupancy(), 3),
+            'avg_utilization': round(k.avg_utilization(), 3),
+            'avg_productivity_score': round(k.avg_productivity_score(), 1),
             'distribution':  k.occupancy_distribution(),
         }
 
     def forecast_occupancy_for_tl(self, team_manager: str,
                                    horizon: int = 7) -> dict:
+        def occupancy(record: dict) -> float:
+            if record.get('occupancy') is not None:
+                try:
+                    return float(record['occupancy'])
+                except (TypeError, ValueError):
+                    pass
+            login = record.get('login_duration', 0) or 0
+            busy = record.get('busy_duration', 0) or 0
+            return busy / login if login else 0.0
+
         agent_to_tl = {a['agent_id']: a['team_manager']
                        for a in self.agents.find_all()}
         daily = defaultdict(list)
         for r in self.repo.find_all():
-            if agent_to_tl.get(r['agent_id']) == team_manager:
-                daily[r['date']].append(r['occupancy'])
+            if agent_to_tl.get(r.get('agent_id')) != team_manager:
+                continue
+            date = r.get('date')
+            if not date:
+                continue
+            occ = occupancy(r)
+            if occ is None:
+                continue
+            daily[date].append(occ)
         if len(daily) < 5:
             return {'error': 'not enough history'}
         series = [mean(daily[d]) for d in sorted(daily)]

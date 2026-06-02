@@ -11,8 +11,10 @@ class AgentView:
         self.ctrl = AgentController()
         self.status = status_var
         self.frame = ttk.Frame(parent)
+        self.all_agents = []  # Almacenar todos los agentes
         
         self._kpi_row()
+        self._search_row()
         self._form()
         self._table()
         self.refresh()
@@ -27,6 +29,56 @@ class AgentView:
         
         for w in (self.kpi_head, self.kpi_risk, self.kpi_over):
             w.pack(side='left', expand=True, fill='x', padx=4)
+
+    def _search_row(self):
+        search_box = ttk.LabelFrame(self.frame, text='Search & Filter', padding=8)
+        search_box.pack(fill='x', padx=8, pady=4)
+        
+        ttk.Label(search_box, text='Agent ID:').grid(row=0, column=0, padx=4, sticky='w')
+        self.search_agent_id = ttk.Entry(search_box, width=16)
+        self.search_agent_id.grid(row=0, column=1, padx=4)
+        
+        ttk.Label(search_box, text='Team Manager:').grid(row=0, column=2, padx=4, sticky='w')
+        self.search_tl = ttk.Entry(search_box, width=16)
+        self.search_tl.grid(row=0, column=3, padx=4)
+        
+        ttk.Button(search_box, text='Search', command=self._apply_filters,
+                   style='Accent.TButton').grid(row=0, column=4, padx=8)
+        ttk.Button(search_box, text='Clear Filters',
+                   command=self._clear_filters).grid(row=0, column=5, padx=4)
+
+    def _apply_filters(self):
+        agent_id_filter = self.search_agent_id.get().strip().lower()
+        tl_filter = self.search_tl.get().strip().lower()
+        
+        for r in self.tree.get_children():
+            self.tree.delete(r)
+        
+        filtered_agents = []
+        for a in self.all_agents:
+            agent_id = str(a.get('agent_id', '')).lower()
+            team_manager = str(a.get('team_manager', '')).lower()
+            
+            match_agent = (not agent_id_filter or agent_id_filter == agent_id)
+            match_tl = (not tl_filter or tl_filter == team_manager)
+            
+            if match_agent and match_tl:
+                filtered_agents.append(a)
+                self.tree.insert('', 'end', values=[a[f] for f in self.FIELDS])
+        
+        # Actualizar KPI total con agentes filtrados
+        self.kpi_head.set_value(str(len(filtered_agents)))
+        self.status.set(f'Filtered: {len(filtered_agents)} agents')
+
+    def _clear_filters(self):
+        self.search_agent_id.delete(0, 'end')
+        self.search_tl.delete(0, 'end')
+        # Restore KPIs
+        k = self.ctrl.kpis()
+        self.kpi_head.set_value(str(k['headcount']))
+        self.kpi_risk.set_value(f"{k['attrition_risk']:.0%}")
+        self.kpi_over.set_value(str(len(k['tls_over_capacity'])))
+        self.refresh()
 
     def _form(self):
         box = ttk.LabelFrame(self.frame, text='Agent', padding=8)
@@ -46,7 +98,8 @@ class AgentView:
                    ('Delete', self._delete), ('Clear', self._clear)]
         
         for txt, cmd in actions:
-            ttk.Button(btns, text=txt, command=cmd).pack(side='left', padx=4)
+            ttk.Button(btns, text=txt, command=cmd,
+                       style='Accent.TButton').pack(side='left', padx=4)
 
     def _table(self):
         self.tree = ttk.Treeview(self.frame, columns=self.FIELDS, show='headings', height=14)
@@ -59,15 +112,30 @@ class AgentView:
         self.tree.bind('<<TreeviewSelect>>', self._on_select)
 
     def refresh(self):
+        # Cargar todos los agentes
+        self.all_agents = self.ctrl.repo.find_all()
+        
         # Limpiar tabla
         for r in self.tree.get_children():
             self.tree.delete(r)
             
-        # Cargar datos
-        for a in self.ctrl.repo.find_all():
-            self.tree.insert('', 'end', values=[a[f] for f in self.FIELDS])
+        # Mostrar agentes (con filtros si existen)
+        agent_id_filter = self.search_agent_id.get().strip().lower()
+        tl_filter = self.search_tl.get().strip().lower()
+        
+        displayed = 0
+        for a in self.all_agents:
+            agent_id = str(a.get('agent_id', '')).lower()
+            team_manager = str(a.get('team_manager', '')).lower()
             
-        # Actualizar KPIs
+            match_agent = (not agent_id_filter or agent_id_filter == agent_id)
+            match_tl = (not tl_filter or tl_filter == team_manager)
+            
+            if match_agent and match_tl:
+                self.tree.insert('', 'end', values=[a[f] for f in self.FIELDS])
+                displayed += 1
+            
+        # Actualizar KPIs (basado en todos los datos)
         k = self.ctrl.kpis()
         self.kpi_head.set_value(str(k['headcount']))
         self.kpi_risk.set_value(f"{k['attrition_risk']:.0%}")

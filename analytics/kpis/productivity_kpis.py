@@ -6,18 +6,59 @@ class ProductivityKPI:
     def __init__(self, records: list):
         self.records = records
 
+    def _occupancy(self, record: dict) -> float:
+        if record.get('occupancy') is not None:
+            try:
+                return float(record['occupancy'])
+            except (TypeError, ValueError):
+                pass
+        login = record.get('login_duration', 0) or 0
+        busy = record.get('busy_duration', 0) or 0
+        result = busy / login if login else 0.0
+        return min(result, 1.0)
+
+    def _utilization(self, record: dict) -> float:
+        if record.get('utilization') is not None:
+            try:
+                return float(record['utilization'])
+            except (TypeError, ValueError):
+                pass
+        login = record.get('login_duration', 0) or 0
+        busy = record.get('busy_duration', 0) or 0
+        available = record.get('available_duration', 0) or 0
+        result = (busy + available) / login if login else 0.0
+        return min(result, 1.0)
+
+    def _productivity_score(self, record: dict) -> float:
+        if record.get('productivity_score') is not None:
+            try:
+                return float(record['productivity_score'])
+            except (TypeError, ValueError):
+                pass
+        occ = min(self._occupancy(record), 1.0)
+        util = min(self._utilization(record), 1.0)
+        login = max(record.get('login_duration', 0) or 1, 1)
+        aux = record.get('aux_duration', 0) or 0
+        aux_ratio = min(aux / login, 1.0)
+        return (0.5 * occ + 0.3 * util + 0.2 * (1 - aux_ratio)) * 100
+
     def avg_occupancy(self) -> float:
-    # Usamos .get() con un valor por defecto de 0 si 'occupancy' no existe
-        vals = [r.get('occupancy', 0) for r in self.records]
+        vals = [self._occupancy(r) for r in self.records]
         return mean(vals) if vals else 0.0
-    # Asegúrate de mantener la lógica de filtrado por 'login_duration' si es necesaria:
-    # vals = [r.get('occupancy', 0) for r in self.records if r.get('login_duration', 0) > 0]
+
+    def avg_utilization(self) -> float:
+        vals = [self._utilization(r) for r in self.records]
+        return mean(vals) if vals else 0.0
+
+    def avg_productivity_score(self) -> float:
+        vals = [self._productivity_score(r) for r in self.records]
+        return mean(vals) if vals else 0.0
     
     
 
     def occupancy_distribution(self) -> dict:
-        vals = [r.get('occupancy', 0) for r in self.records
-                if r.get('login_duration', 0)    > 0]
+        vals = [self._occupancy(r) for r in self.records
+                if (r.get('login_duration', 0) or 0) > 0]
         if not vals:
             return {}
         s = sorted(vals)
@@ -32,7 +73,7 @@ class ProductivityKPI:
     def occupancy_by_tl(self, agent_to_tl: dict) -> dict:
         buckets = defaultdict(list)
         for r in self.records:
-            tl = agent_to_tl.get(r['agent_id'])
-            if tl and r['login_duration'] > 0:
-                buckets[tl].append(r['occupancy'])
+            tl = agent_to_tl.get(r.get('agent_id'))
+            if tl and (r.get('login_duration', 0) or 0) > 0:
+                buckets[tl].append(self._occupancy(r))
         return {tl: round(mean(v), 3) for tl, v in buckets.items()}

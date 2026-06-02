@@ -8,6 +8,8 @@ from controllers.agent_controller import AgentController
 from domain.exceptions.custom_exceptions import CallCenterError
 from views.widgets.kpi_card import KPICard
 from views.widgets.forecast_chart import ForecastChart
+from analytics.kpis.productivity_kpis import ProductivityKPI
+from analytics.kpis.productivity_kpis import ProductivityKPI
 
 
 class ProductivityView:
@@ -33,7 +35,9 @@ class ProductivityView:
         self.agent_ctrl = AgentController()
         self.status = status_var
         self.frame = ttk.Frame(parent)
+        self.all_records = []
         self._kpi_row()
+        self._search_row()
         self._form()
         self._table()
         self._forecast_section()
@@ -45,15 +49,89 @@ class ProductivityView:
         row.pack(fill='x', padx=8, pady=6)
         self.kpi_occ = KPICard(row, 'Avg Occupancy',
                                 'busy / login_duration')
+        self.kpi_util = KPICard(row, 'Avg Utilization',
+                                 '(busy + available) / login_duration')
         self.kpi_p10 = KPICard(row, 'P10 Occupancy',
                                 'percentil 10 - bajos')
         self.kpi_p90 = KPICard(row, 'P90 Occupancy',
                                 'percentil 90 - altos')
+        self.kpi_prod = KPICard(row, 'Avg Productivity',
+                                 'score promedio')
         self.kpi_total = KPICard(row, 'Records',
                                   'total registrados')
-        for w in (self.kpi_occ, self.kpi_p10, self.kpi_p90, self.kpi_total):
+        for w in (self.kpi_occ, self.kpi_util, self.kpi_p10,
+                  self.kpi_p90, self.kpi_prod, self.kpi_total):
             w.pack(side='left', expand=True, fill='x', padx=4)
+    def _search_row(self):
+        search_box = ttk.LabelFrame(self.frame, text='Search & Filter', padding=8)
+        search_box.pack(fill='x', padx=8, pady=4)
+        
+        ttk.Label(search_box, text='Agent ID:').grid(row=0, column=0, padx=4, sticky='w')
+        self.search_agent_id = ttk.Entry(search_box, width=16)
+        self.search_agent_id.grid(row=0, column=1, padx=4)
+        
+        ttk.Label(search_box, text='Date (YYYY-MM-DD):').grid(row=0, column=2, padx=4, sticky='w')
+        self.search_date = ttk.Entry(search_box, width=16)
+        self.search_date.grid(row=0, column=3, padx=4)
+        
+        ttk.Button(search_box, text='Search', command=self._apply_filters,
+                   style='Accent.TButton').grid(row=0, column=4, padx=8)
+        ttk.Button(search_box, text='Clear Filters',
+                   command=self._clear_filters).grid(row=0, column=5, padx=4)
 
+    def _apply_filters(self):
+        agent_id_filter = self.search_agent_id.get().strip().lower()
+        date_filter = self.search_date.get().strip().lower()
+        
+        for r in self.tree.get_children():
+            self.tree.delete(r)
+        
+        filtered_records = []
+        for p in self.all_records:
+            agent_id = str(p.get('agent_id', '')).lower()
+            date = str(p.get('date', '')).lower()
+            
+            match_agent = (not agent_id_filter or agent_id_filter == agent_id)
+            match_date = (not date_filter or date_filter == date)
+            
+            if match_agent and match_date:
+                filtered_records.append(p)
+                row = self._format_record_for_table(p)
+                self.tree.insert('', 'end',
+                    values=[row.get(f, '') for f in self.TABLE_COLUMNS])
+        
+        # Actualizar KPIs para los registros filtrados
+        if filtered_records:
+            kpi = ProductivityKPI(filtered_records)
+            self.kpi_occ.set_value(f"{kpi.avg_occupancy():.0%}")
+            self.kpi_util.set_value(f"{kpi.avg_utilization():.0%}")
+            dist = kpi.occupancy_distribution()
+            self.kpi_p10.set_value(f"{dist.get('p10', 0):.0%}")
+            self.kpi_p90.set_value(f"{dist.get('p90', 0):.0%}")
+            self.kpi_prod.set_value(f"{kpi.avg_productivity_score():.1f}")
+        else:
+            self.kpi_occ.set_value("0%")
+            self.kpi_util.set_value("0%")
+            self.kpi_p10.set_value("0%")
+            self.kpi_p90.set_value("0%")
+            self.kpi_prod.set_value("0.0")
+        
+        self.kpi_total.set_value(str(len(filtered_records)))
+        self.status.set(f'Filtered: {len(filtered_records)} records')
+
+    def _clear_filters(self):
+        self.search_agent_id.delete(0, 'end')
+        self.search_date.delete(0, 'end')
+        # Restore all KPIs
+        kpis = self.ctrl.kpis()
+        self.kpi_occ.set_value(f"{kpis.get('avg_occupancy', 0):.0%}")
+        self.kpi_util.set_value(f"{kpis.get('avg_utilization', 0):.0%}")
+        dist = kpis.get('distribution', {})
+        self.kpi_p10.set_value(f"{dist.get('p10', 0):.0%}")
+        self.kpi_p90.set_value(f"{dist.get('p90', 0):.0%}")
+        self.kpi_prod.set_value(f"{kpis.get('avg_productivity_score', 0):.1f}")
+        self.kpi_total.set_value(str(len(self.all_records)))
+        self.refresh()
     # ---------- Formulario CRUD ----------
     def _form(self):
         box = ttk.LabelFrame(self.frame, text='Productivity Record',
@@ -79,8 +157,8 @@ class ProductivityView:
                          ('Update', self._update),
                          ('Delete', self._delete),
                          ('Clear', self._clear)]:
-            ttk.Button(btns, text=txt, command=cmd
-                       ).pack(side='left', padx=4)
+            ttk.Button(btns, text=txt, command=cmd,
+                       style='Accent.TButton').pack(side='left', padx=4)
 
     # ---------- Tabla ----------
     def _table(self):
@@ -101,49 +179,83 @@ class ProductivityView:
         scroll.pack(side='right', fill='y')
         self.tree.bind('<<TreeviewSelect>>', self._on_select)
 
+    def _format_record_for_table(self, record: dict) -> dict:
+        enriched = dict(record)
+        enriched['occupancy'] = round(ProductivityKPI([record])._occupancy(record), 3)
+        enriched['utilization'] = round(ProductivityKPI([record])._utilization(record), 3)
+        enriched['productivity_score'] = round(ProductivityKPI([record])._productivity_score(record), 1)
+        return enriched
+
     # ---------- Sección de Forecast ----------
     def _forecast_section(self):
         fc_box = ttk.LabelFrame(self.frame,
                                  text='Occupancy Forecast by Team Manager',
-                                 padding=6)
-        fc_box.pack(fill='both', expand=False, padx=8, pady=4)
+                                 padding=8)
+        fc_box.pack(fill='both', expand=True, padx=8, pady=4)
+        fc_box.columnconfigure(0, weight=1)
+        fc_box.rowconfigure(1, weight=1)
 
         controls = ttk.Frame(fc_box)
-        controls.pack(fill='x', pady=2)
-        ttk.Label(controls, text='Team Manager:').pack(side='left', padx=4)
+        controls.grid(row=0, column=0, sticky='ew', pady=(0, 8))
+        controls.columnconfigure(1, weight=1)
+
+        ttk.Label(controls, text='Team Manager:').grid(row=0, column=0,
+                                                       padx=(0, 8), pady=2,
+                                                       sticky='w')
         self.tl_var = tk.StringVar()
         self.tl_combo = ttk.Combobox(controls, textvariable=self.tl_var,
-                                       width=12, state='readonly')
-        self.tl_combo.pack(side='left', padx=4)
+                                       width=20, state='readonly')
+        self.tl_combo.grid(row=0, column=1, padx=(0, 16), pady=2,
+                            sticky='ew')
 
-        ttk.Label(controls, text='Horizon (days):').pack(side='left', padx=4)
+        ttk.Label(controls, text='Horizon (days):').grid(row=0, column=2,
+                                                         padx=(0, 8), pady=2,
+                                                         sticky='w')
         self.horizon_var = tk.StringVar(value='7')
-        ttk.Spinbox(controls, from_=3, to=30, width=5,
+        ttk.Spinbox(controls, from_=3, to=30, width=6,
                      textvariable=self.horizon_var
-                     ).pack(side='left', padx=4)
+                     ).grid(row=0, column=3, padx=(0, 12), pady=2)
 
         ttk.Button(controls, text='Run Forecast',
                     command=self._run_forecast
-                    ).pack(side='left', padx=8)
+                    ).grid(row=0, column=4, padx=4, pady=2)
 
         self.chart = ForecastChart(fc_box)
-        self.chart.pack(fill='both', expand=True)
+        self.chart.grid(row=1, column=0, sticky='nsew')
 
     # ---------- Refresh ----------
     def refresh(self):
+        # Cargar todos los registros
+        self.all_records = self.ctrl.repo.find_all()
+        
         # Tabla
         for r in self.tree.get_children():
             self.tree.delete(r)
-        for p in self.ctrl.repo.find_all():
-            self.tree.insert('', 'end',
-                values=[p.get(f, '') for f in self.TABLE_COLUMNS])
+        
+        # Mostrar registros (con filtros si existen)
+        agent_id_filter = self.search_agent_id.get().strip().lower()
+        date_filter = self.search_date.get().strip().lower()
+        
+        for p in self.all_records:
+            agent_id = str(p.get('agent_id', '')).lower()
+            date = str(p.get('date', '')).lower()
+            
+            match_agent = (not agent_id_filter or agent_id_filter == agent_id)
+            match_date = (not date_filter or date_filter == date)
+            
+            if match_agent and match_date:
+                row = self._format_record_for_table(p)
+                self.tree.insert('', 'end',
+                    values=[row.get(f, '') for f in self.TABLE_COLUMNS])
 
         # KPI cards
         kpis = self.ctrl.kpis()
         self.kpi_occ.set_value(f"{kpis.get('avg_occupancy', 0):.0%}")
+        self.kpi_util.set_value(f"{kpis.get('avg_utilization', 0):.0%}")
         dist = kpis.get('distribution', {})
         self.kpi_p10.set_value(f"{dist.get('p10', 0):.0%}")
         self.kpi_p90.set_value(f"{dist.get('p90', 0):.0%}")
+        self.kpi_prod.set_value(f"{kpis.get('avg_productivity_score', 0):.1f}")
         self.kpi_total.set_value(str(len(self.ctrl.repo.find_all())))
 
         # Lista de TLs para el combobox
@@ -247,8 +359,14 @@ class ProductivityView:
                             for a in self.agent_ctrl.repo.find_all()}
             daily = defaultdict(list)
             for r in self.ctrl.repo.find_all():
-                if agent_to_tl.get(r['agent_id']) == tl:
-                    daily[r['date']].append(r['occupancy'])
+                if agent_to_tl.get(r.get('agent_id')) != tl:
+                    continue
+                occ = r.get('occupancy')
+                if occ is None:
+                    login = r.get('login_duration', 0) or 0
+                    busy = r.get('busy_duration', 0) or 0
+                    occ = busy / login if login else 0.0
+                daily[r.get('date', '')].append(occ)
             history = [mean(daily[d]) for d in sorted(daily)]
 
             preds = result['predictions']

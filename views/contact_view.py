@@ -7,6 +7,7 @@ from controllers.agent_controller import AgentController
 from domain.exceptions.custom_exceptions import CallCenterError
 from views.widgets.kpi_card import KPICard
 from views.widgets.forecast_chart import ForecastChart
+from analytics.kpis.contact_kpis import ContactKPICalculator
 
 
 class ContactView:
@@ -37,7 +38,9 @@ class ContactView:
         self.agent_ctrl = AgentController()
         self.status = status_var
         self.frame = ttk.Frame(parent)
+        self.all_contacts = []
         self._kpi_row()
+        self._search_row()
         self._form()
         self._table()
         self._forecast_section()
@@ -58,6 +61,86 @@ class ContactView:
         for w in (self.kpi_aht_overall, self.kpi_aht_phone,
                   self.kpi_aht_chat, self.kpi_total):
             w.pack(side='left', expand=True, fill='x', padx=4)
+
+    def _search_row(self):
+        search_box = ttk.LabelFrame(self.frame, text='Search & Filter', padding=8)
+        search_box.pack(fill='x', padx=8, pady=4)
+        
+        ttk.Label(search_box, text='Agent ID:').grid(row=0, column=0, padx=4, sticky='w')
+        self.search_agent_id = ttk.Entry(search_box, width=16)
+        self.search_agent_id.grid(row=0, column=1, padx=4)
+        
+        ttk.Label(search_box, text='LOB:').grid(row=0, column=2, padx=4, sticky='w')
+        self.search_lob = ttk.Entry(search_box, width=16)
+        self.search_lob.grid(row=0, column=3, padx=4)
+        
+        ttk.Label(search_box, text='Channel:').grid(row=0, column=4, padx=4, sticky='w')
+        self.search_channel = ttk.Entry(search_box, width=16)
+        self.search_channel.grid(row=0, column=5, padx=4)
+        
+        ttk.Button(search_box, text='Search', command=self._apply_filters,
+                   style='Accent.TButton').grid(row=0, column=6, padx=8)
+        ttk.Button(search_box, text='Clear Filters',
+                   command=self._clear_filters).grid(row=0, column=7, padx=4)
+
+    def _apply_filters(self):
+        agent_id_filter = self.search_agent_id.get().strip().lower()
+        lob_filter = self.search_lob.get().strip().lower()
+        channel_filter = self.search_channel.get().strip().lower()
+        
+        for r in self.tree.get_children():
+            self.tree.delete(r)
+        
+        filtered_records = []
+        for c in self.all_contacts:
+            agent_id = str(c.get('agent_id', '')).lower()
+            lob = str(c.get('lob', '')).lower()
+            channel = str(c.get('channel', '')).lower()
+            
+            match_agent = (not agent_id_filter or agent_id_filter == agent_id)
+            match_lob = (not lob_filter or lob_filter == lob)
+            match_channel = (not channel_filter or channel_filter == channel)
+            
+            if match_agent and match_lob and match_channel:
+                filtered_records.append(c)
+                row = []
+                for f in self.TABLE_COLUMNS:
+                    if f == 'aht':
+                        handled = (c.get('inbound_tx', 0) or 0) + (c.get('outbound_tx', 0) or 0)
+                        aht = ((c.get('handle_time', 0) or 0) + (c.get('acw', 0) or 0)) / handled if handled else 0
+                        row.append(f"{aht:.1f}")
+                    else:
+                        row.append(c.get(f, ''))
+                self.tree.insert('', 'end', values=row)
+        
+        # Actualizar KPIs para los registros filtrados
+        if filtered_records:
+            kpi = ContactKPICalculator(filtered_records)
+            aht_overall = kpi.aht()
+            aht_ch = kpi.aht_by_channel()
+            self.kpi_aht_overall.set_value(f"{aht_overall:.1f}s")
+            self.kpi_aht_phone.set_value(f"{aht_ch.get('Phone', 0):.1f}s")
+            self.kpi_aht_chat.set_value(f"{aht_ch.get('Chat', 0):.1f}s")
+        else:
+            self.kpi_aht_overall.set_value("0.0s")
+            self.kpi_aht_phone.set_value("0.0s")
+            self.kpi_aht_chat.set_value("0.0s")
+        
+        self.kpi_total.set_value(str(len(filtered_records)))
+        self.status.set(f'Filtered: {len(filtered_records)} contacts')
+
+    def _clear_filters(self):
+        self.search_agent_id.delete(0, 'end')
+        self.search_lob.delete(0, 'end')
+        self.search_channel.delete(0, 'end')
+        # Restore all KPIs
+        kpi = self.ctrl.kpis()
+        self.kpi_aht_overall.set_value(f"{kpi.get('aht_overall', 0):.1f}s")
+        aht_ch = kpi.get('aht_by_channel', {})
+        self.kpi_aht_phone.set_value(f"{aht_ch.get('Phone', 0):.1f}s")
+        self.kpi_aht_chat.set_value(f"{aht_ch.get('Chat', 0):.1f}s")
+        self.kpi_total.set_value(str(len(self.all_contacts)))
+        self.refresh()
 
     # ---------- Formulario CRUD ----------
     def _form(self):
@@ -90,8 +173,8 @@ class ContactView:
                          ('Update', self._update),
                          ('Delete', self._delete),
                          ('Clear', self._clear)]:
-            ttk.Button(btns, text=txt, command=cmd
-                       ).pack(side='left', padx=4)
+            ttk.Button(btns, text=txt, command=cmd,
+                       style='Accent.TButton').pack(side='left', padx=4)
 
     # ---------- Tabla ----------
     def _table(self):
@@ -143,12 +226,37 @@ class ContactView:
 
     # ---------- Refresh ----------
     def refresh(self):
+        # Cargar todos los contactos
+        self.all_contacts = self.ctrl.repo.find_all()
+        
         # Tabla
         for r in self.tree.get_children():
             self.tree.delete(r)
-        for c in self.ctrl.repo.find_all():
-            self.tree.insert('', 'end',
-                values=[c.get(f, '') for f in self.TABLE_COLUMNS])
+        
+        # Mostrar contactos (con filtros si existen)
+        agent_id_filter = self.search_agent_id.get().strip().lower()
+        lob_filter = self.search_lob.get().strip().lower()
+        channel_filter = self.search_channel.get().strip().lower()
+        
+        for c in self.all_contacts:
+            agent_id = str(c.get('agent_id', '')).lower()
+            lob = str(c.get('lob', '')).lower()
+            channel = str(c.get('channel', '')).lower()
+            
+            match_agent = (not agent_id_filter or agent_id_filter == agent_id)
+            match_lob = (not lob_filter or lob_filter == lob)
+            match_channel = (not channel_filter or channel_filter == channel)
+            
+            if match_agent and match_lob and match_channel:
+                row = []
+                for f in self.TABLE_COLUMNS:
+                    if f == 'aht':
+                        handled = (c.get('inbound_tx', 0) or 0) + (c.get('outbound_tx', 0) or 0)
+                        aht = ((c.get('handle_time', 0) or 0) + (c.get('acw', 0) or 0)) / handled if handled else 0
+                        row.append(f"{aht:.1f}")
+                    else:
+                        row.append(c.get(f, ''))
+                self.tree.insert('', 'end', values=row)
 
         # KPI cards
         kpis = self.ctrl.kpis()
